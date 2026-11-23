@@ -16,7 +16,7 @@ index.html             الصفحة الرئيسية
 style.css              التصميم
 app.js                 المنطق
 sw.js                  العمل بدون إنترنت (Service Worker)
-manifest.webmanifest   بيانات التطبيق للتثبيت
+manifest.json          بيانات التطبيق للتثبيت
 icon-192.png, icon-512.png, icon-maskable-512.png, apple-touch-icon.png   الأيقونات
 README.md              هذا الملف
 ```
