@@ -619,6 +619,91 @@ button {
   }
 }
 
+/* التكبير والتصغير */
+.stage {
+  overflow: hidden;
+}
+
+.book-host {
+  transform-origin: center center;
+}
+
+.book-host.animating {
+  transition: transform 0.2s ease;
+}
+
+.zoom-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  touch-action: none;
+  cursor: grab;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.zoom-overlay.dragging {
+  cursor: grabbing;
+}
+
+.zoom-tools {
+  position: absolute;
+  top: 10px;
+  left: max(10px, env(safe-area-inset-left));
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.zoom-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  font-weight: 800;
+  color: var(--ink);
+  border-radius: 12px;
+  background: rgba(20, 12, 7, 0.72);
+  border: 1px solid rgba(255, 244, 222, 0.16);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+  transition: background 0.15s ease, opacity 0.15s ease;
+}
+
+.zoom-btn:hover:not(:disabled) {
+  background: rgba(227, 176, 75, 0.3);
+}
+
+.zoom-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.zoom-btn.zoom-reset {
+  height: 30px;
+  font-size: 0.72rem;
+  font-variant-numeric: tabular-nums;
+}
+
+@media (orientation: landscape) and (max-height: 520px) {
+  .zoom-tools {
+    top: 6px;
+    gap: 4px;
+  }
+
+  .zoom-btn {
+    width: 34px;
+    height: 34px;
+  }
+
+  .zoom-btn.zoom-reset {
+    height: 26px;
+  }
+}
+
 /* التثبيت */
 .install-box {
   max-width: 520px;
