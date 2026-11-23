@@ -2,14 +2,14 @@
  * يخزّن ملفات الموقع والمكتبات بعد أول تحميل ليعمل بدون إنترنت.
  * عند تعديل الموقع ورفع نسخة جديدة، غيّر رقم VERSION ليتحدّث عند المستخدمين.
  */
-var VERSION = 'waraq-v2';
+var VERSION = 'waraq-v3';
 
 var CORE = [
   './',
   'index.html',
   'style.css',
   'app.js',
-  'manifest.webmanifest',
+  'manifest.json',
   'icon-192.png',
   'icon-512.png',
   'icon-maskable-512.png',
