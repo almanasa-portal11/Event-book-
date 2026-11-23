@@ -61,10 +61,10 @@
       <input id="file-input" type="file" accept="application/pdf,.pdf" hidden>
 
       <ul class="chips">
-        <li>🔒 ملفك لا يغادر جهازك</li>
-        <li>📖 تقليب واقعي بالسحب</li>
-        <li>🔊 صوت ورق حقيقي</li>
-        <li>🔖 يتذكّر آخر صفحة</li>
+        <li> ملفك لا يغادر جهازك</li>
+        <li> تقليب واقعي بالسحب</li>
+        <li> صوت ورق حقيقي</li>
+        <li> يتذكّر آخر صفحة</li>
       </ul>
 
       <div id="install-box" class="install-box" hidden>
@@ -106,6 +106,18 @@
 
     <div id="stage" class="stage">
       <div id="book-host" class="book-host"></div>
+
+      <div id="zoom-overlay" class="zoom-overlay" hidden></div>
+
+      <div class="zoom-tools" role="group" aria-label="التكبير والتصغير">
+        <button id="btn-zoom-in" class="zoom-btn" type="button" aria-label="تكبير" title="تكبير (+)">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+        </button>
+        <button id="btn-zoom-reset" class="zoom-btn zoom-reset" type="button" aria-label="إعادة الحجم الأصلي" title="الحجم الأصلي (0)">100%</button>
+        <button id="btn-zoom-out" class="zoom-btn" type="button" aria-label="تصغير" title="تصغير (-)">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M5 12h14"/></svg>
+        </button>
+      </div>
     </div>
 
     <footer id="controls" class="controls" dir="rtl">
