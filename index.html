@@ -7,7 +7,7 @@
   <meta name="theme-color" content="#1a110b">
   <title>ورّاق · اقلب صفحات كتابك</title>
   <meta name="description" content="ارفع كتابك بصيغة PDF وعِش تجربة تقليب الصفحات كأنك تمسك كتابًا حقيقيًا. يعمل بالكامل على جهازك دون رفع ملفك لأي خادم.">
-  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="manifest" href="manifest.json">
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -66,6 +66,11 @@
         <li>🔊 صوت ورق حقيقي</li>
         <li>🔖 يتذكّر آخر صفحة</li>
       </ul>
+
+      <div id="install-box" class="install-box" hidden>
+        <button id="btn-install" class="btn-primary btn-install" type="button" hidden>⬇ ثبّت التطبيق على هاتفك</button>
+        <p id="install-hint" class="install-hint" hidden></p>
+      </div>
     </div>
   </main>
 
