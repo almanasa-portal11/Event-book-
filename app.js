@@ -735,6 +735,71 @@
   window.addEventListener('resize', onViewportChange);
   window.addEventListener('orientationchange', onViewportChange);
 
+  /* ---------- زر التثبيت ورسائل التشخيص ---------- */
+  var installBox = $('install-box');
+  var btnInstall = $('btn-install');
+  var installHint = $('install-hint');
+  var deferredPrompt = null;
+
+  function isStandalone() {
+    return (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) ||
+      window.navigator.standalone === true;
+  }
+
+  function showInstallBox(hint, withButton) {
+    if (isStandalone()) return;
+    installHint.textContent = hint || '';
+    installHint.hidden = !hint;
+    btnInstall.hidden = !withButton;
+    installBox.hidden = false;
+  }
+
+  window.addEventListener('beforeinstallprompt', function (e) {
+    e.preventDefault();
+    deferredPrompt = e;
+    showInstallBox('', true);
+  });
+
+  window.addEventListener('appinstalled', function () {
+    deferredPrompt = null;
+    installBox.hidden = true;
+    toast('تم تثبيت التطبيق 🎉');
+  });
+
+  btnInstall.addEventListener('click', function () {
+    if (!deferredPrompt) return;
+    var p = deferredPrompt;
+    deferredPrompt = null;
+    p.prompt();
+    if (p.userChoice && typeof p.userChoice.then === 'function') {
+      p.userChoice.then(function () { installBox.hidden = true; });
+    }
+  });
+
+  window.setTimeout(function () {
+    if (isStandalone() || deferredPrompt) return;
+    var ua = navigator.userAgent || '';
+    var secure = window.isSecureContext || window.location.hostname === 'localhost';
+
+    if (!secure) {
+      showInstallBox('التثبيت يحتاج أن يُفتح الموقع عبر رابط https مثل GitHub Pages، وليس من ملف على الجهاز.', false);
+      return;
+    }
+    if (/FBAN|FBAV|Instagram|Line\/|Snapchat|TikTok|MicroMessenger|Telegram/i.test(ua)) {
+      showInstallBox('أنت تفتح الموقع داخل متصفح تطبيق آخر. افتح الرابط في Chrome أو Safari ثم ثبّته.', false);
+      return;
+    }
+    var isIOS = /iPhone|iPad|iPod/i.test(ua) ||
+      (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    if (isIOS) {
+      showInstallBox('للتثبيت على الآيفون: افتح الموقع في Safari، ثم اضغط زر المشاركة، ثم «إضافة إلى الشاشة الرئيسية».', false);
+      return;
+    }
+    if (window.matchMedia && window.matchMedia('(pointer: coarse)').matches) {
+      showInstallBox('للتثبيت: افتح قائمة المتصفح ⋮ واختر «تثبيت التطبيق» أو «إضافة إلى الشاشة الرئيسية».', false);
+    }
+  }, 2500);
+
   /* ---------- تسجيل Service Worker (للتثبيت والعمل بدون إنترنت) ---------- */
   if ('serviceWorker' in navigator && /^https?:$/.test(window.location.protocol)) {
     window.addEventListener('load', function () {
