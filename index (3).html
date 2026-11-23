@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="dark">
+  <meta name="theme-color" content="#1a110b">
+  <title>ورّاق · اقلب صفحات كتابك</title>
+  <meta name="description" content="ارفع كتابك بصيغة PDF وعِش تجربة تقليب الصفحات كأنك تمسك كتابًا حقيقيًا. يعمل بالكامل على جهازك دون رفع ملفك لأي خادم.">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23b8742f'/%3E%3Cpath d='M32 18c-6-4-14-4-20-2v30c6-2 14-2 20 2 6-4 14-4 20-2V16c-6-2-14-2-20 2z' fill='%23fff3dc'/%3E%3Cpath d='M32 18v30' stroke='%23b8742f' stroke-width='2'/%3E%3C/svg%3E">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Aref+Ruqaa:wght@400;700&family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+
+  <script defer src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/page-flip@2.0.7/dist/js/page-flip.browser.js"></script>
+  <script defer src="app.js"></script>
+</head>
+<body>
+
+  <noscript>
+    <p class="noscript">يحتاج الموقع إلى تفعيل JavaScript ليعمل.</p>
+  </noscript>
+
+  <!-- ============ شاشة الرفع ============ -->
+  <main id="upload-screen" class="screen upload">
+    <div class="hero">
+      <div class="demo" aria-hidden="true">
+        <div class="demo-page demo-left"></div>
+        <div class="demo-page demo-right"></div>
+        <div class="demo-leaf">
+          <div class="face front"></div>
+          <div class="face back"></div>
+        </div>
+        <div class="demo-spine"></div>
+      </div>
+
+      <p class="brand">ورّاق</p>
+      <h1>كتابك بين يديك.. <em>اقلب الصفحة</em> كأنك تمسكه فعلًا</h1>
+      <p class="sub">ارفع أي كتاب بصيغة PDF وسيتحوّل إلى كتاب حقيقي بصفحات تنقلب بالسحب أو اللمس، مع ظل وصوت ورق.</p>
+
+      <label id="dropzone" class="dropzone" for="file-input" tabindex="0">
+        <svg class="dz-icon" viewBox="0 0 48 48" width="52" height="52" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M14 6h14l8 8v26a2 2 0 0 1-2 2H14a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2z"/>
+          <path d="M28 6v8h8"/>
+          <path d="M24 35V22M18.5 27.5 24 22l5.5 5.5"/>
+        </svg>
+        <span class="dz-title">اسحب ملف الـ PDF وأفلته هنا</span>
+        <span class="dz-or">أو</span>
+        <span class="btn-primary">اختر ملفًا من جهازك</span>
+      </label>
+      <input id="file-input" type="file" accept="application/pdf,.pdf" hidden>
+
+      <ul class="chips">
+        <li>🔒 ملفك لا يغادر جهازك</li>
+        <li>📖 تقليب واقعي بالسحب</li>
+        <li>🔊 صوت ورق حقيقي</li>
+        <li>🔖 يتذكّر آخر صفحة</li>
+      </ul>
+    </div>
+  </main>
+
+  <!-- ============ شاشة القراءة ============ -->
+  <section id="reader-screen" class="screen reader" hidden>
+    <header class="topbar">
+      <button id="btn-new" class="icon-btn" type="button" aria-label="فتح كتاب آخر" title="فتح كتاب آخر">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M12 11v5M9.5 13.5h5"/></svg>
+      </button>
+
+      <div class="title-box">
+        <span class="brand small">ورّاق</span>
+        <span id="book-title" class="book-title"></span>
+      </div>
+
+      <div class="top-actions">
+        <button id="btn-dir" class="chip" type="button" title="اتجاه تقليب الصفحات">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 7h12M7 7l3-3M7 7l3 3M17 17H5M17 17l-3-3M17 17l-3 3"/></svg>
+          <span>اتجاه: <b id="dir-label">عربي</b></span>
+        </button>
+        <button id="btn-sound" class="icon-btn" type="button" aria-pressed="true" aria-label="صوت التقليب" title="صوت التقليب">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M11 5 6 9H3v6h3l5 4z"/>
+            <g class="waves"><path d="M15.5 9a4 4 0 0 1 0 6"/><path d="M18.5 6.5a8 8 0 0 1 0 11"/></g>
+            <path class="mute-line" d="m16 9 5 6m0-6-5 6"/>
+          </svg>
+        </button>
+        <button id="btn-fullscreen" class="icon-btn" type="button" aria-label="ملء الشاشة" title="ملء الشاشة">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>
+        </button>
+      </div>
+    </header>
+
+    <div id="stage" class="stage">
+      <div id="book-host" class="book-host"></div>
+    </div>
+
+    <footer id="controls" class="controls" dir="rtl">
+      <button id="btn-prev" class="nav-btn" type="button" aria-label="الصفحة السابقة">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 5-7 7 7 7"/></svg>
+        <span class="btn-label">السابق</span>
+      </button>
+
+      <div class="slider-box">
+        <input id="page-slider" type="range" min="1" max="1" value="1" step="1" aria-label="الانتقال إلى صفحة">
+        <span id="page-label" class="page-label" aria-live="polite"></span>
+      </div>
+
+      <button id="btn-next" class="nav-btn" type="button" aria-label="الصفحة التالية">
+        <span class="btn-label">التالي</span>
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 5-7 7 7 7"/></svg>
+      </button>
+    </footer>
+  </section>
+
+  <!-- ============ شاشة التحميل والتنبيهات ============ -->
+  <div id="loader" class="loader" hidden>
+    <div class="loader-card">
+      <div class="spinner" aria-hidden="true"></div>
+      <p id="loader-text">جارٍ التحميل…</p>
+    </div>
+  </div>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+</body>
+</html>
