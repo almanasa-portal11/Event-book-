@@ -7,6 +7,12 @@
   <meta name="theme-color" content="#1a110b">
   <title>ورّاق · اقلب صفحات كتابك</title>
   <meta name="description" content="ارفع كتابك بصيغة PDF وعِش تجربة تقليب الصفحات كأنك تمسك كتابًا حقيقيًا. يعمل بالكامل على جهازك دون رفع ملفك لأي خادم.">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="ورّاق">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23b8742f'/%3E%3Cpath d='M32 18c-6-4-14-4-20-2v30c6-2 14-2 20 2 6-4 14-4 20-2V16c-6-2-14-2-20 2z' fill='%23fff3dc'/%3E%3Cpath d='M32 18v30' stroke='%23b8742f' stroke-width='2'/%3E%3C/svg%3E">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -48,6 +54,7 @@
           <path d="M24 35V22M18.5 27.5 24 22l5.5 5.5"/>
         </svg>
         <span class="dz-title">اسحب ملف الـ PDF وأفلته هنا</span>
+        <span class="dz-title-touch">اختر كتابًا بصيغة PDF من هاتفك</span>
         <span class="dz-or">أو</span>
         <span class="btn-primary">اختر ملفًا من جهازك</span>
       </label>
@@ -113,6 +120,21 @@
       </button>
     </footer>
   </section>
+
+  <!-- ============ اقتراح قلب الهاتف ============ -->
+  <div id="rotate-tip" class="rotate-tip" role="dialog" aria-label="اقتراح قلب الهاتف" hidden>
+    <div class="rt-icon" aria-hidden="true">
+      <svg viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="7" y="2.5" width="10" height="19" rx="2.2"/><path d="M11 18.5h2"/></svg>
+    </div>
+    <div class="rt-body">
+      <p class="rt-title">اقلب هاتفك أفقيًا</p>
+      <p class="rt-text">تجربة أقرب للكتاب الحقيقي: صفحتان جنبًا إلى جنب وتقليب أوسع.</p>
+      <div class="rt-actions">
+        <button id="btn-tip-ok" class="rt-btn primary" type="button">متابعة هكذا</button>
+        <button id="btn-tip-off" class="rt-btn" type="button">إيقاف التنبيه</button>
+      </div>
+    </div>
+  </div>
 
   <!-- ============ شاشة التحميل والتنبيهات ============ -->
   <div id="loader" class="loader" hidden>
