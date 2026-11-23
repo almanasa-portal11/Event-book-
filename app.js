@@ -42,7 +42,12 @@
     toast: $('toast'),
     rotateTip: $('rotate-tip'),
     btnTipOk: $('btn-tip-ok'),
-    btnTipOff: $('btn-tip-off')
+    btnTipOff: $('btn-tip-off'),
+    stage: $('stage'),
+    zoomOverlay: $('zoom-overlay'),
+    btnZoomIn: $('btn-zoom-in'),
+    btnZoomOut: $('btn-zoom-out'),
+    btnZoomReset: $('btn-zoom-reset')
   };
 
   /* ---------- تخزين محلي آمن ---------- */
@@ -82,7 +87,10 @@
     buildId: 0,
     targetWidth: 900,
     current: 0,            // أول صفحة ظاهرة (0-based)
-    busy: false
+    busy: false,
+    zoom: 1,
+    panX: 0,
+    panY: 0
   };
 
   /* ---------- أدوات صغيرة ---------- */
@@ -177,7 +185,8 @@
     pw = Math.min(pw, 1400);
     if (pw * state.ratio > h) pw = h / state.ratio;
     var dpr = Math.min(window.devicePixelRatio || 1, 2);
-    return clamp(Math.round(pw * dpr), 500, 1500);
+    var base = clamp(Math.round(pw * dpr), 500, 1500);
+    return Math.min(Math.round(base * state.zoom), 2400);
   }
 
   function renderIndex(i) {
@@ -191,11 +200,12 @@
     if (!pdf) return Promise.resolve();
 
     state.pending.add(i);
+    var tw = state.targetWidth;
 
     return pdf.getPage(orig + 1)
       .then(function (page) {
         var base = page.getViewport({ scale: 1 });
-        var scale = state.targetWidth / base.width;
+        var scale = tw / base.width;
         var viewport = page.getViewport({ scale: scale });
 
         var canvas = document.createElement('canvas');
@@ -212,6 +222,11 @@
             canvas.height = 0;
             return;
           }
+          var oldCanvas = el.querySelector('canvas');
+          if (oldCanvas) {
+            oldCanvas.width = 0;
+            oldCanvas.height = 0;
+          }
           el.textContent = '';
           el.appendChild(canvas);
           state.rendered.add(i);
@@ -224,7 +239,13 @@
         state.rendered.add(i);
       })
       .then(function () {
-        if (bid === state.buildId) state.pending.delete(i);
+        if (bid !== state.buildId) return;
+        state.pending.delete(i);
+        // تغيّرت الدقة المطلوبة أثناء الرسم (تكبير مثلًا): نعيد رسم الصفحات القريبة
+        if (tw !== state.targetWidth && Math.abs(i - currentEngineIndex()) <= 2) {
+          state.rendered.delete(i);
+          renderIndex(i);
+        }
       });
   }
 
@@ -240,18 +261,30 @@
     state.rendered.delete(i);
   }
 
+  // عند التكبير نرسم صفحات أقل (لكن بدقة أعلى) لتوفير الذاكرة
+  function windowBounds(idx) {
+    var zoomed = state.zoom > 1.05;
+    return {
+      lo: idx - (zoomed ? 1 : 4),
+      hi: idx + (zoomed ? 2 : 5),
+      kLo: idx - (zoomed ? 3 : 8),
+      kHi: idx + (zoomed ? 4 : 9)
+    };
+  }
+
   function renderWindow(idx) {
     var n = state.pageEls.length;
     if (!n) return;
+    var b = windowBounds(idx);
     var list = [];
-    for (var i = Math.max(0, idx - 4); i <= Math.min(n - 1, idx + 5); i++) list.push(i);
+    for (var i = Math.max(0, b.lo); i <= Math.min(n - 1, b.hi); i++) list.push(i);
     list.sort(function (a, b) {
       return Math.abs(a - idx) - Math.abs(b - idx);
     });
     list.forEach(function (i) { renderIndex(i); });
 
     Array.from(state.rendered).forEach(function (i) {
-      if (i < idx - 8 || i > idx + 9) releaseIndex(i);
+      if (i < b.kLo || i > b.kHi) releaseIndex(i);
     });
   }
 
@@ -347,6 +380,7 @@
   function buildBook(startOrig) {
     var id = ++state.buildId;
     destroyFlip();
+    resetZoom();
 
     var n = state.numPages;
     startOrig = clamp(startOrig || 0, 0, n - 1);
@@ -540,7 +574,7 @@
         hideLoader();
         state.busy = false;
         updateRotateTip();
-        if (els.rotateTip.hidden && store.get('waraq:hint', '0') !== '1') {
+        if ((!els.rotateTip || els.rotateTip.hidden) && store.get('waraq:hint', '0') !== '1') {
           store.set('waraq:hint', '1');
           window.setTimeout(function () {
             toast('اسحب زاوية الصفحة أو اضغط على حافتها لتقليبها 📖', 'info', 5000);
@@ -683,10 +717,246 @@
         e.preventDefault();
         goTo(state.numPages - 1);
         break;
+      case '+':
+      case '=':
+        e.preventDefault();
+        stepZoom(1);
+        break;
+      case '-':
+      case '_':
+        e.preventDefault();
+        stepZoom(-1);
+        break;
+      case '0':
+        e.preventDefault();
+        setZoom(1, true, 0, 0);
+        break;
       default:
         break;
     }
   });
+
+  /* ---------- التكبير والتصغير ---------- */
+  var ZOOM_MIN = 1;
+  var ZOOM_MAX = 4;
+  var ZOOM_STEPS = [1, 1.5, 2, 3, 4];
+  var zoomHinted = false;
+  var refreshTimer = null;
+
+  // مركز منطقة الكتاب قبل أي تحويل (بإحداثيات الشاشة)
+  function hostCenter() {
+    var sr = els.stage.getBoundingClientRect();
+    return {
+      x: sr.left + els.bookHost.offsetLeft + els.bookHost.offsetWidth / 2,
+      y: sr.top + els.bookHost.offsetTop + els.bookHost.offsetHeight / 2
+    };
+  }
+
+  function applyTransform(animate) {
+    els.bookHost.classList.toggle('animating', !!animate);
+    els.bookHost.style.transform = state.zoom === 1
+      ? ''
+      : 'translate(' + state.panX + 'px,' + state.panY + 'px) scale(' + state.zoom + ')';
+  }
+
+  function clampPan() {
+    var mx = Math.max(0, (state.zoom - 1) * els.bookHost.offsetWidth / 2);
+    var my = Math.max(0, (state.zoom - 1) * els.bookHost.offsetHeight / 2);
+    state.panX = clamp(state.panX, -mx, mx);
+    state.panY = clamp(state.panY, -my, my);
+  }
+
+  function updateZoomUI() {
+    var z = state.zoom;
+    if (els.zoomOverlay) els.zoomOverlay.hidden = z === 1;
+    if (els.btnZoomReset) els.btnZoomReset.textContent = Math.round(z * 100) + '%';
+    if (els.btnZoomIn) els.btnZoomIn.disabled = z >= ZOOM_MAX - 0.001;
+    if (els.btnZoomOut) els.btnZoomOut.disabled = z <= ZOOM_MIN;
+  }
+
+  // نعيد رسم الصفحات بدقة تناسب مستوى التكبير الجديد
+  function refreshResolution() {
+    if (!state.flip) return;
+    var nw = estimateTargetWidth();
+    if (nw > state.targetWidth * 1.2 || nw < state.targetWidth * 0.7) {
+      state.targetWidth = nw;
+      var idx = currentEngineIndex();
+      var b = windowBounds(idx);
+      Array.from(state.rendered).forEach(function (i) {
+        if (i >= b.lo && i <= b.hi) state.rendered.delete(i);
+        else releaseIndex(i);
+      });
+      renderWindow(idx);
+    }
+  }
+
+  function scheduleRefresh() {
+    window.clearTimeout(refreshTimer);
+    refreshTimer = window.setTimeout(refreshResolution, 220);
+  }
+
+  // rx, ry: نقطة التكبير بالنسبة لمركز الكتاب (بكسل الشاشة)
+  function setZoom(z, animate, rx, ry) {
+    z = clamp(z, ZOOM_MIN, ZOOM_MAX);
+    if (z < 1.05) z = 1;
+    rx = rx || 0;
+    ry = ry || 0;
+    var f = z / state.zoom;
+    state.panX = rx - f * (rx - state.panX);
+    state.panY = ry - f * (ry - state.panY);
+    state.zoom = z;
+    if (z === 1) {
+      state.panX = 0;
+      state.panY = 0;
+    }
+    clampPan();
+    applyTransform(animate);
+    updateZoomUI();
+    scheduleRefresh();
+
+    if (z > 1 && !zoomHinted) {
+      zoomHinted = true;
+      toast('اسحب لتحريك الصفحة، وانقر مرتين للعودة إلى 100%', 'info', 4500);
+    }
+  }
+
+  function resetZoom() {
+    state.zoom = 1;
+    state.panX = 0;
+    state.panY = 0;
+    applyTransform(false);
+    updateZoomUI();
+  }
+
+  function stepZoom(dir) {
+    var z = state.zoom;
+    var target = z;
+    var i;
+    if (dir > 0) {
+      for (i = 0; i < ZOOM_STEPS.length; i++) {
+        if (ZOOM_STEPS[i] > z + 0.01) { target = ZOOM_STEPS[i]; break; }
+      }
+    } else {
+      for (i = ZOOM_STEPS.length - 1; i >= 0; i--) {
+        if (ZOOM_STEPS[i] < z - 0.01) { target = ZOOM_STEPS[i]; break; }
+      }
+    }
+    setZoom(target, true, 0, 0);
+  }
+
+  if (els.btnZoomIn) els.btnZoomIn.addEventListener('click', function () { stepZoom(1); });
+  if (els.btnZoomOut) els.btnZoomOut.addEventListener('click', function () { stepZoom(-1); });
+  if (els.btnZoomReset) els.btnZoomReset.addEventListener('click', function () { setZoom(1, true, 0, 0); });
+
+  // عجلة الماوس / قرص لوحة اللمس
+  if (els.stage) {
+    els.stage.addEventListener('wheel', function (e) {
+      if (!state.flip) return;
+      e.preventDefault();
+      var dy = e.deltaMode === 1 ? e.deltaY * 33 : e.deltaY;
+      var f = Math.exp(-dy * (e.ctrlKey ? 0.012 : 0.0016));
+      var c = hostCenter();
+      setZoom(state.zoom * f, false, e.clientX - c.x, e.clientY - c.y);
+    }, { passive: false });
+  }
+
+  // تحريك الصفحة بالسحب، والقرص بإصبعين، والنقر المزدوج للعودة (يعمل عند التكبير فقط)
+  var pointers = {};
+  var lastMid = null;
+  var lastDist = 0;
+  var tapInfo = null;
+  var lastTap = { t: 0, x: 0, y: 0 };
+
+  function pointerList() {
+    return Object.keys(pointers).map(function (k) { return pointers[k]; });
+  }
+
+  function pDist(a, b) {
+    return Math.sqrt((a.x - b.x) * (a.x - b.x) + (a.y - b.y) * (a.y - b.y));
+  }
+
+  function pMid(a, b) {
+    return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+  }
+
+  function resetGestureRef() {
+    var l = pointerList();
+    if (l.length >= 2) {
+      lastDist = pDist(l[0], l[1]);
+      lastMid = pMid(l[0], l[1]);
+    } else if (l.length === 1) {
+      lastDist = 0;
+      lastMid = { x: l[0].x, y: l[0].y };
+    } else {
+      lastDist = 0;
+      lastMid = null;
+    }
+  }
+
+  function endPointer(e) {
+    if (!pointers[e.pointerId]) return;
+    delete pointers[e.pointerId];
+    if (pointerList().length === 0) {
+      els.zoomOverlay.classList.remove('dragging');
+      var now = Date.now();
+      if (tapInfo && !tapInfo.moved && now - tapInfo.t < 300) {
+        if (now - lastTap.t < 320 &&
+            Math.abs(e.clientX - lastTap.x) + Math.abs(e.clientY - lastTap.y) < 40) {
+          lastTap.t = 0;
+          setZoom(1, true, 0, 0);
+        } else {
+          lastTap = { t: now, x: e.clientX, y: e.clientY };
+        }
+      }
+      tapInfo = null;
+    }
+    resetGestureRef();
+  }
+
+  if (els.zoomOverlay) {
+    els.zoomOverlay.addEventListener('pointerdown', function (e) {
+      try { els.zoomOverlay.setPointerCapture(e.pointerId); } catch (err) { /* تجاهل */ }
+      pointers[e.pointerId] = { x: e.clientX, y: e.clientY };
+      if (pointerList().length === 1) {
+        tapInfo = { x: e.clientX, y: e.clientY, t: Date.now(), moved: false };
+        els.zoomOverlay.classList.add('dragging');
+      } else {
+        tapInfo = null;
+      }
+      resetGestureRef();
+    });
+
+    els.zoomOverlay.addEventListener('pointermove', function (e) {
+      if (!pointers[e.pointerId]) return;
+      pointers[e.pointerId] = { x: e.clientX, y: e.clientY };
+      if (tapInfo && Math.abs(e.clientX - tapInfo.x) + Math.abs(e.clientY - tapInfo.y) > 10) {
+        tapInfo.moved = true;
+      }
+
+      var l = pointerList();
+      if (l.length >= 2) {
+        var d = pDist(l[0], l[1]);
+        var m = pMid(l[0], l[1]);
+        if (lastDist > 0 && lastMid) {
+          var c = hostCenter();
+          state.panX += m.x - lastMid.x;
+          state.panY += m.y - lastMid.y;
+          setZoom(state.zoom * (d / lastDist), false, m.x - c.x, m.y - c.y);
+        }
+        lastDist = d;
+        lastMid = m;
+      } else if (l.length === 1 && lastMid) {
+        state.panX += l[0].x - lastMid.x;
+        state.panY += l[0].y - lastMid.y;
+        lastMid = { x: l[0].x, y: l[0].y };
+        clampPan();
+        applyTransform(false);
+      }
+    });
+
+    els.zoomOverlay.addEventListener('pointerup', endPointer);
+    els.zoomOverlay.addEventListener('pointercancel', endPointer);
+  }
 
   /* ---------- اقتراح قلب الهاتف + التكيّف مع تغيّر الاتجاه ---------- */
   var tipDismissed = false;
@@ -697,6 +967,7 @@
   }
 
   function updateRotateTip() {
+    if (!els.rotateTip) return;
     var show = !els.reader.hidden &&
       !tipDismissed &&
       store.get('waraq:rotateTip', '1') === '1' &&
@@ -704,12 +975,12 @@
     els.rotateTip.hidden = !show;
   }
 
-  els.btnTipOk.addEventListener('click', function () {
+  if (els.btnTipOk) els.btnTipOk.addEventListener('click', function () {
     tipDismissed = true;
     updateRotateTip();
   });
 
-  els.btnTipOff.addEventListener('click', function () {
+  if (els.btnTipOff) els.btnTipOff.addEventListener('click', function () {
     store.set('waraq:rotateTip', '0');
     tipDismissed = true;
     updateRotateTip();
@@ -722,13 +993,9 @@
     window.clearTimeout(viewportTimer);
     viewportTimer = window.setTimeout(function () {
       if (!state.flip) return;
-      // عند تغيّر حجم الصفحة كثيرًا نعيد رسمها بدقة مناسبة
-      var nw = estimateTargetWidth();
-      if (nw > state.targetWidth * 1.25 || nw < state.targetWidth * 0.6) {
-        state.targetWidth = nw;
-        Array.from(state.rendered).forEach(releaseIndex);
-        renderWindow(currentEngineIndex());
-      }
+      clampPan();
+      applyTransform(false);
+      refreshResolution();
     }, 350);
   }
 
@@ -747,6 +1014,7 @@
   }
 
   function showInstallBox(hint, withButton) {
+    if (!installBox || !btnInstall || !installHint) return;
     if (isStandalone()) return;
     installHint.textContent = hint || '';
     installHint.hidden = !hint;
@@ -762,17 +1030,17 @@
 
   window.addEventListener('appinstalled', function () {
     deferredPrompt = null;
-    installBox.hidden = true;
+    if (installBox) installBox.hidden = true;
     toast('تم تثبيت التطبيق 🎉');
   });
 
-  btnInstall.addEventListener('click', function () {
+  if (btnInstall) btnInstall.addEventListener('click', function () {
     if (!deferredPrompt) return;
     var p = deferredPrompt;
     deferredPrompt = null;
     p.prompt();
     if (p.userChoice && typeof p.userChoice.then === 'function') {
-      p.userChoice.then(function () { installBox.hidden = true; });
+      p.userChoice.then(function () { if (installBox) installBox.hidden = true; });
     }
   });
 
