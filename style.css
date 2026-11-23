@@ -619,6 +619,30 @@ button {
   }
 }
 
+/* التثبيت */
+.install-box {
+  max-width: 520px;
+  margin: 22px auto 0;
+  text-align: center;
+}
+
+.btn-install {
+  border: 0;
+  font-size: 1rem;
+  cursor: pointer;
+}
+
+.install-hint {
+  margin-top: 10px;
+  padding: 10px 14px;
+  color: var(--muted);
+  font-size: 0.9rem;
+  line-height: 1.9;
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(227, 176, 75, 0.2);
+}
+
 /* ===================== تحسينات الجوال ===================== */
 
 html {
