@@ -39,7 +39,10 @@
     pageLabel: $('page-label'),
     loader: $('loader'),
     loaderText: $('loader-text'),
-    toast: $('toast')
+    toast: $('toast'),
+    rotateTip: $('rotate-tip'),
+    btnTipOk: $('btn-tip-ok'),
+    btnTipOff: $('btn-tip-off')
   };
 
   /* ---------- تخزين محلي آمن ---------- */
@@ -536,7 +539,8 @@
       .then(function () {
         hideLoader();
         state.busy = false;
-        if (store.get('waraq:hint', '0') !== '1') {
+        updateRotateTip();
+        if (els.rotateTip.hidden && store.get('waraq:hint', '0') !== '1') {
           store.set('waraq:hint', '1');
           window.setTimeout(function () {
             toast('اسحب زاوية الصفحة أو اضغط على حافتها لتقليبها 📖', 'info', 5000);
@@ -609,6 +613,7 @@
     closeBook();
     showScreen('upload');
     els.pageLabel.textContent = '';
+    updateRotateTip();
   });
 
   els.btnPrev.addEventListener('click', goPrev);
@@ -682,6 +687,62 @@
         break;
     }
   });
+
+  /* ---------- اقتراح قلب الهاتف + التكيّف مع تغيّر الاتجاه ---------- */
+  var tipDismissed = false;
+
+  function isPhonePortrait() {
+    var coarse = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
+    return !!coarse && window.innerWidth < 700 && window.innerHeight > window.innerWidth;
+  }
+
+  function updateRotateTip() {
+    var show = !els.reader.hidden &&
+      !tipDismissed &&
+      store.get('waraq:rotateTip', '1') === '1' &&
+      isPhonePortrait();
+    els.rotateTip.hidden = !show;
+  }
+
+  els.btnTipOk.addEventListener('click', function () {
+    tipDismissed = true;
+    updateRotateTip();
+  });
+
+  els.btnTipOff.addEventListener('click', function () {
+    store.set('waraq:rotateTip', '0');
+    tipDismissed = true;
+    updateRotateTip();
+    toast('تم إيقاف التنبيه.');
+  });
+
+  var viewportTimer = null;
+  function onViewportChange() {
+    updateRotateTip();
+    window.clearTimeout(viewportTimer);
+    viewportTimer = window.setTimeout(function () {
+      if (!state.flip) return;
+      // عند تغيّر حجم الصفحة كثيرًا نعيد رسمها بدقة مناسبة
+      var nw = estimateTargetWidth();
+      if (nw > state.targetWidth * 1.25 || nw < state.targetWidth * 0.6) {
+        state.targetWidth = nw;
+        Array.from(state.rendered).forEach(releaseIndex);
+        renderWindow(currentEngineIndex());
+      }
+    }, 350);
+  }
+
+  window.addEventListener('resize', onViewportChange);
+  window.addEventListener('orientationchange', onViewportChange);
+
+  /* ---------- تسجيل Service Worker (للتثبيت والعمل بدون إنترنت) ---------- */
+  if ('serviceWorker' in navigator && /^https?:$/.test(window.location.protocol)) {
+    window.addEventListener('load', function () {
+      navigator.serviceWorker.register('sw.js').catch(function () {
+        /* التثبيت اختياري، نتجاهل أي فشل */
+      });
+    });
+  }
 
   /* ---------- بداية التشغيل ---------- */
   updateDirUI();
